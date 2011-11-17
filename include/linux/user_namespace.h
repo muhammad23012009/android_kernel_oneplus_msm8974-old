@@ -21,7 +21,6 @@ struct user_namespace {
 	struct uid_gid_map	uid_map;
 	struct uid_gid_map	gid_map;
 	struct kref		kref;
-	struct hlist_head	uidhash_table[UIDHASH_SZ];
 	struct user_namespace	*parent;
 	kuid_t			owner;
 	kgid_t			group;
