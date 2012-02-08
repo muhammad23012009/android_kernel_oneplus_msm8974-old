@@ -871,6 +871,41 @@ config NET_NS
 
 endif # NAMESPACES
 
+config UIDGID_CONVERTED
+	# True if all of the selected software conmponents are known
+	# to have uid_t and gid_t converted to kuid_t and kgid_t
+	# where appropriate and are otherwise safe to use with
+	# the user namespace.
+	bool
+	default y
+
+	# Networking
+	depends on NET_9P = n
+
+	# Filesystems
+	depends on 9P_FS = n
+	depends on AFS_FS = n
+	depends on CEPH_FS = n
+	depends on CIFS = n
+	depends on CODA_FS = n
+	depends on FUSE_FS = n
+	depends on GFS2_FS = n
+	depends on NCP_FS = n
+	depends on NFSD = n
+	depends on NFS_FS = n
+	depends on OCFS2_FS = n
+	depends on XFS_FS = n
+
+config UIDGID_STRICT_TYPE_CHECKS
+	bool "Require conversions between uid/gids and their internal representation"
+	depends on UIDGID_CONVERTED
+	default n
+	help
+	 While the nececessary conversions are being added to all subsystems this option allows
+	 the code to continue to build for unconverted subsystems.
+
+	 Say Y here if you want the strict type checking enabled
+
 config SCHED_AUTOGROUP
 	bool "Automatic process group scheduling"
 	select EVENTFD
