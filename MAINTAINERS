@@ -2695,6 +2695,16 @@ S:	Maintained
 F:	Documentation/hwmon/f71805f
 F:	drivers/hwmon/f71805f.c
 
+<<<<<<< HEAD
+=======
+FC0011 TUNER DRIVER
+M:	Michael Buesch <m@bues.ch>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+F:	drivers/media/tuners/fc0011.h
+F:	drivers/media/tuners/fc0011.c
+
+>>>>>>> ccae7af2bf0... [media] common: move media/common/tuners to media/tuners
 FANOTIFY
 M:	Eric Paris <eparis@redhat.com>
 S:	Maintained
