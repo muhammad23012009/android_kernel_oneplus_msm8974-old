@@ -99,18 +99,7 @@ obj-$(CONFIG_DVB_USB_LME2510) += dvb-usb-lmedm04.o
 dvb-usb-technisat-usb2-objs = technisat-usb2.o
 obj-$(CONFIG_DVB_USB_TECHNISAT_USB2) += dvb-usb-technisat-usb2.o
 
-dvb-usb-it913x-objs := it913x.o
-obj-$(CONFIG_DVB_USB_IT913X) += dvb-usb-it913x.o
-
-dvb-usb-mxl111sf-objs = mxl111sf.o mxl111sf-phy.o mxl111sf-i2c.o mxl111sf-gpio.o
-obj-$(CONFIG_DVB_USB_MXL111SF) += dvb-usb-mxl111sf.o
-obj-$(CONFIG_DVB_USB_MXL111SF) += mxl111sf-demod.o
-obj-$(CONFIG_DVB_USB_MXL111SF) += mxl111sf-tuner.o
-
-dvb-usb-rtl28xxu-objs = rtl28xxu.o
-obj-$(CONFIG_DVB_USB_RTL28XXU) += dvb-usb-rtl28xxu.o
-
-ccflags-y += -I$(srctree)/drivers/media/dvb/dvb-core
+ccflags-y += -I$(srctree)/drivers/media/dvb-core
 ccflags-y += -I$(srctree)/drivers/media/dvb/frontends/
 # due to tuner-xc3028
 ccflags-y += -I$(srctree)/drivers/media/common/tuners
