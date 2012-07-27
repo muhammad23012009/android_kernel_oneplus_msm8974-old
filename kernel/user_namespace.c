@@ -26,6 +26,24 @@ static struct kmem_cache *user_ns_cachep __read_mostly;
 static bool new_idmap_permitted(struct user_namespace *ns, int cap_setid,
 				struct uid_gid_map *map);
 
+static void set_cred_user_ns(struct cred *cred, struct user_namespace *user_ns)
+{
+	/* Start with the same capabilities as init but useless for doing
+	 * anything as the capabilities are bound to the new user namespace.
+	 */
+	cred->securebits = SECUREBITS_DEFAULT;
+	cred->cap_inheritable = CAP_EMPTY_SET;
+	cred->cap_permitted = CAP_FULL_SET;
+	cred->cap_effective = CAP_FULL_SET;
+	cred->cap_bset = CAP_FULL_SET;
+#ifdef CONFIG_KEYS
+	key_put(cred->request_key_auth);
+	cred->request_key_auth = NULL;
+#endif
+	/* tgcred will be cleared in our caller bc CLONE_THREAD won't be set */
+	cred->user_ns = user_ns;
+}
+
 /*
  * Create a new user namespace, deriving the creator from the user in the
  * passed credentials, and replacing that user with the new root user for the
@@ -53,23 +71,10 @@ int create_user_ns(struct cred *new)
 		return -ENOMEM;
 
 	kref_init(&ns->kref);
+	/* Leave the new->user_ns reference with the new user namespace. */
 	ns->parent = parent_ns;
 	ns->owner = owner;
 	ns->group = group;
-
-	/* Start with the same capabilities as init but useless for doing
-	 * anything as the capabilities are bound to the new user namespace.
-	 */
-	new->securebits = SECUREBITS_DEFAULT;
-	new->cap_inheritable = CAP_EMPTY_SET;
-	new->cap_permitted = CAP_FULL_SET;
-	new->cap_effective = CAP_FULL_SET;
-	new->cap_bset = CAP_FULL_SET;
-#ifdef CONFIG_KEYS
-	key_put(new->request_key_auth);
-	new->request_key_auth = NULL;
-#endif
-	/* tgcred will be cleared in our caller bc CLONE_THREAD won't be set */
 
 	set_cred_user_ns(new, ns);
 
@@ -586,6 +591,25 @@ ssize_t proc_gid_map_write(struct file *file, const char __user *buf, size_t siz
 static bool new_idmap_permitted(struct user_namespace *ns, int cap_setid,
 				struct uid_gid_map *new_map)
 {
+	/* Allow mapping to your own filesystem ids */
+	if ((new_map->nr_extents == 1) && (new_map->extent[0].count == 1)) {
+		u32 id = new_map->extent[0].lower_first;
+		if (cap_setid == CAP_SETUID) {
+			kuid_t uid = make_kuid(ns->parent, id);
+			if (uid_eq(uid, current_fsuid()))
+				return true;
+		}
+		else if (cap_setid == CAP_SETGID) {
+			kgid_t gid = make_kgid(ns->parent, id);
+			if (gid_eq(gid, current_fsgid()))
+				return true;
+		}
+	}
+
+	/* Allow anyone to set a mapping that doesn't require privilege */
+	if (!cap_valid(cap_setid))
+		return true;
+
 	/* Allow the specified ids if we have the appropriate capability
 	 * (CAP_SETUID or CAP_SETGID) over the parent user namespace.
 	 */
