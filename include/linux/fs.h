@@ -41,6 +41,20 @@ struct fstrim_range {
 	__u64 len;
 	__u64 minlen;
 };
+struct export_operations;
+struct hd_geometry;
+struct iovec;
+struct nameidata;
+struct kiocb;
+struct kobject;
+struct pipe_inode_info;
+struct poll_table_struct;
+struct kstatfs;
+struct vm_area_struct;
+struct vfsmount;
+struct cred;
+struct swap_info_struct;
+struct seq_file;
 
 /* And dynamically-tunable limits and defaults: */
 struct files_stat_struct {
@@ -1691,6 +1705,7 @@ struct file_operations {
 	int (*setlease)(struct file *, long, struct file_lock **);
 	long (*fallocate)(struct file *file, int mode, loff_t offset,
 			  loff_t len);
+	int (*show_fdinfo)(struct seq_file *m, struct file *f);
 };
 
 struct inode_operations {
@@ -1729,8 +1744,6 @@ struct inode_operations {
 			   umode_t create_mode, int *opened);
 	int (*tmpfile) (struct inode *, struct dentry *, umode_t);
 } ____cacheline_aligned;
-
-struct seq_file;
 
 ssize_t rw_copy_check_uvector(int type, const struct iovec __user * uvector,
 			      unsigned long nr_segs, unsigned long fast_segs,
