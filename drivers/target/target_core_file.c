@@ -323,10 +323,24 @@ static int fd_do_readv(struct se_task *task)
 			return (ret < 0 ? ret : -EINVAL);
 		}
 	} else {
-		if (ret < 0) {
-			pr_err("vfs_readv() returned %d for non"
-				" S_ISBLK\n", ret);
-			return ret;
+		/*
+		 * Return zeros and GOOD status even if the READ did not return
+		 * the expected virt_size for struct file w/o a backing struct
+		 * block_device.
+		 */
+		if (S_ISBLK(file_inode(fd)->i_mode)) {
+			if (ret < 0 || ret != cmd->data_length) {
+				pr_err("%s() returned %d, expecting %u for "
+						"S_ISBLK\n", __func__, ret,
+						cmd->data_length);
+				return (ret < 0 ? ret : -EINVAL);
+			}
+		} else {
+			if (ret < 0) {
+				pr_err("%s() returned %d for non S_ISBLK\n",
+						__func__, ret);
+				return ret;
+			}
 		}
 	}
 

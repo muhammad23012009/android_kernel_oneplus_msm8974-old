@@ -375,10 +375,25 @@ struct file *fget_raw_light(unsigned int fd, int *fput_needed)
 
 void put_filp(struct file *file)
 {
-	if (atomic_long_dec_and_test(&file->f_count)) {
-		security_file_free(file);
-		file_free(file);
-	}
+	struct file *f;
+
+	lg_global_lock(&files_lglock);
+	do_file_list_for_each_entry(sb, f) {
+		if (!S_ISREG(file_inode(f)->i_mode))
+		       continue;
+		if (!file_count(f))
+			continue;
+		if (!(f->f_mode & FMODE_WRITE))
+			continue;
+		spin_lock(&f->f_lock);
+		f->f_mode &= ~FMODE_WRITE;
+		spin_unlock(&f->f_lock);
+		if (file_check_writeable(f) != 0)
+			continue;
+		__mnt_drop_write(f->f_path.mnt);
+		file_release_write(f);
+	} while_file_list_for_each_entry;
+	lg_global_unlock(&files_lglock);
 }
 
 void __init files_init(unsigned long mempages)

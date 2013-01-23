@@ -737,28 +737,17 @@ static int mdp_histogram_destroy(void)
 
 static int mdp_histogram_init(void)
 {
-	struct mdp_hist_mgmt *temp;
-	int i, ret;
+	int ret = 0;
+	struct fd f = fdget(img->memory_id);
+	if (f.file == NULL)
+		return -1;
 
-	if (mdp_pp_initialized)
-		return -EEXIST;
-
-	mdp_hist_wq = alloc_workqueue("mdp_hist_wq",
-					WQ_NON_REENTRANT | WQ_UNBOUND, 0);
-
-	for (i = 0; i < MDP_HIST_MGMT_MAX; i++)
-		mdp_hist_mgmt_array[i] = NULL;
-
-	if (mdp_rev >= MDP_REV_30) {
-		temp = kmalloc(sizeof(struct mdp_hist_mgmt), GFP_KERNEL);
-		if (!temp)
-			goto exit;
-		ret = mdp_hist_init_mgmt(temp, MDP_BLOCK_DMA_P);
-		if (ret) {
-			kfree(temp);
-			goto exit;
-		}
-	}
+	if (MAJOR(file_inode(f.file)->i_rdev) == FB_MAJOR) {
+		*start = info->fix.smem_start;
+		*len = info->fix.smem_len;
+	} else
+		ret = -1;
+	fdput(f);
 
 	if (mdp_rev >= MDP_REV_40) {
 		temp = kmalloc(sizeof(struct mdp_hist_mgmt), GFP_KERNEL);

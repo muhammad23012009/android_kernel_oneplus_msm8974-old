@@ -431,10 +431,6 @@ static int apparmor_file_open(struct file *file, const struct cred *cred)
 
 	label = aa_get_newest_cred_label(cred);
 	if (!unconfined(label)) {
-		struct inode *inode = file_inode(file);
-		struct path_cond cond = { inode->i_uid, inode->i_mode };
-
-		error = aa_path_perm(OP_OPEN, label, &file->f_path, 0,
 				     aa_map_file_to_perms(file), &cond);
 		/* todo cache full allowed permissions set and state */
 		fcxt->allow = aa_map_file_to_perms(file);

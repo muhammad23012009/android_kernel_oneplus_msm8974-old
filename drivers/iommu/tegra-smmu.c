@@ -858,6 +858,174 @@ static struct iommu_ops smmu_iommu_ops = {
 	.pgsize_bitmap	= SMMU_IOMMU_PGSIZES,
 };
 
+/* Should be in the order of enum */
+static const char * const smmu_debugfs_mc[] = { "mc", };
+static const char * const smmu_debugfs_cache[] = {  "tlb", "ptc", };
+
+static ssize_t smmu_debugfs_stats_write(struct file *file,
+					const char __user *buffer,
+					size_t count, loff_t *pos)
+{
+	struct smmu_debugfs_info *info;
+	struct smmu_device *smmu;
+	int i;
+	enum {
+		_OFF = 0,
+		_ON,
+		_RESET,
+	};
+	const char * const command[] = {
+		[_OFF]		= "off",
+		[_ON]		= "on",
+		[_RESET]	= "reset",
+	};
+	char str[] = "reset";
+	u32 val;
+	size_t offs;
+
+	count = min_t(size_t, count, sizeof(str));
+	if (copy_from_user(str, buffer, count))
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(command); i++)
+		if (strncmp(str, command[i],
+			    strlen(command[i])) == 0)
+			break;
+
+	if (i == ARRAY_SIZE(command))
+		return -EINVAL;
+
+	info = file_inode(file)->i_private;
+	smmu = info->smmu;
+
+	offs = SMMU_CACHE_CONFIG(info->cache);
+	val = smmu_read(smmu, offs);
+	switch (i) {
+	case _OFF:
+		val &= ~SMMU_CACHE_CONFIG_STATS_ENABLE;
+		val &= ~SMMU_CACHE_CONFIG_STATS_TEST;
+		smmu_write(smmu, val, offs);
+		break;
+	case _ON:
+		val |= SMMU_CACHE_CONFIG_STATS_ENABLE;
+		val &= ~SMMU_CACHE_CONFIG_STATS_TEST;
+		smmu_write(smmu, val, offs);
+		break;
+	case _RESET:
+		val |= SMMU_CACHE_CONFIG_STATS_TEST;
+		smmu_write(smmu, val, offs);
+		val &= ~SMMU_CACHE_CONFIG_STATS_TEST;
+		smmu_write(smmu, val, offs);
+		break;
+	default:
+		BUG();
+		break;
+	}
+
+	dev_dbg(smmu->dev, "%s() %08x, %08x @%08x\n", __func__,
+		val, smmu_read(smmu, offs), offs);
+
+	return count;
+}
+
+static int smmu_debugfs_stats_show(struct seq_file *s, void *v)
+{
+	struct smmu_debugfs_info *info;
+	struct smmu_device *smmu;
+	struct dentry *dent;
+	int i;
+	const char * const stats[] = { "hit", "miss", };
+
+	dent = d_find_alias(s->private);
+	info = dent->d_inode->i_private;
+	smmu = info->smmu;
+
+	for (i = 0; i < ARRAY_SIZE(stats); i++) {
+		u32 val;
+		size_t offs;
+
+		offs = SMMU_STATS_CACHE_COUNT(info->mc, info->cache, i);
+		val = smmu_read(smmu, offs);
+		seq_printf(s, "%s:%08x ", stats[i], val);
+
+		dev_dbg(smmu->dev, "%s() %s %08x @%08x\n", __func__,
+			stats[i], val, offs);
+	}
+	seq_printf(s, "\n");
+	dput(dent);
+
+	return 0;
+}
+
+static int smmu_debugfs_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, smmu_debugfs_stats_show, inode);
+}
+
+static const struct file_operations smmu_debugfs_stats_fops = {
+	.open		= smmu_debugfs_stats_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= smmu_debugfs_stats_write,
+};
+
+static void smmu_debugfs_delete(struct smmu_device *smmu)
+{
+	debugfs_remove_recursive(smmu->debugfs_root);
+	kfree(smmu->debugfs_info);
+}
+
+static void smmu_debugfs_create(struct smmu_device *smmu)
+{
+	int i;
+	size_t bytes;
+	struct dentry *root;
+
+	bytes = ARRAY_SIZE(smmu_debugfs_mc) * ARRAY_SIZE(smmu_debugfs_cache) *
+		sizeof(*smmu->debugfs_info);
+	smmu->debugfs_info = kmalloc(bytes, GFP_KERNEL);
+	if (!smmu->debugfs_info)
+		return;
+
+	root = debugfs_create_dir(dev_name(smmu->dev), NULL);
+	if (!root)
+		goto err_out;
+	smmu->debugfs_root = root;
+
+	for (i = 0; i < ARRAY_SIZE(smmu_debugfs_mc); i++) {
+		int j;
+		struct dentry *mc;
+
+		mc = debugfs_create_dir(smmu_debugfs_mc[i], root);
+		if (!mc)
+			goto err_out;
+
+		for (j = 0; j < ARRAY_SIZE(smmu_debugfs_cache); j++) {
+			struct dentry *cache;
+			struct smmu_debugfs_info *info;
+
+			info = smmu->debugfs_info;
+			info += i * ARRAY_SIZE(smmu_debugfs_mc) + j;
+			info->smmu = smmu;
+			info->mc = i;
+			info->cache = j;
+
+			cache = debugfs_create_file(smmu_debugfs_cache[j],
+						    S_IWUGO | S_IRUGO, mc,
+						    (void *)info,
+						    &smmu_debugfs_stats_fops);
+			if (!cache)
+				goto err_out;
+		}
+	}
+
+	return;
+
+err_out:
+	smmu_debugfs_delete(smmu);
+}
+
 static int tegra_smmu_suspend(struct device *dev)
 {
 	struct smmu_device *smmu = dev_get_drvdata(dev);

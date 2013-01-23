@@ -121,18 +121,13 @@ static int get_device_index(struct coda_mount_data *data)
 		return -1;
 	}
 
-	file = fget(data->fd);
-	inode = NULL;
-	if(file)
-		inode = file->f_path.dentry->d_inode;
-	
-	if(!inode || !S_ISCHR(inode->i_mode) ||
-	   imajor(inode) != CODA_PSDEV_MAJOR) {
-		if(file)
-			fput(file);
-
-		printk("coda_read_super: Bad file\n");
-		return -1;
+	f = fdget(data->fd);
+	if (!f.file)
+		goto Ebadf;
+	inode = file_inode(f.file);
+	if (!S_ISCHR(inode->i_mode) || imajor(inode) != CODA_PSDEV_MAJOR) {
+		fdput(f);
+		goto Ebadf;
 	}
 
 	idx = iminor(inode);

@@ -93,9 +93,8 @@ static ssize_t
 ext4_file_write(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t pos)
 {
-	struct inode *inode = iocb->ki_filp->f_path.dentry->d_inode;
-	int unaligned_aio = 0;
-	int ret;
+	struct inode *inode = file_inode(iocb->ki_filp);
+	ssize_t ret;
 
 	/*
 	 * If we have encountered a bitmap-format file, the size limit
