@@ -1307,6 +1307,12 @@ struct net_device {
 
 #define	NETDEV_ALIGN		32
 
+static inline unsigned int netdev_hash_mix(const struct net_device *dev)
+{
+	return (unsigned int)(((unsigned long)dev) >>
+			max(L1_CACHE_BYTES, NETDEV_ALIGN));
+}
+
 static inline
 int netdev_get_prio_tc_map(const struct net_device *dev, u32 prio)
 {
