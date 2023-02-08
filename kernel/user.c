@@ -80,7 +80,7 @@ struct user_struct root_user = {
 	.files		= ATOMIC_INIT(0),
 	.sigpending	= ATOMIC_INIT(0),
 	.locked_shm     = 0,
-	.user_ns	= &init_user_ns,
+	.uid		= GLOBAL_ROOT_UID,
 };
 
 /*
@@ -94,7 +94,6 @@ static void uid_hash_insert(struct user_struct *up, struct hlist_head *hashent)
 static void uid_hash_remove(struct user_struct *up)
 {
 	hlist_del_init(&up->uidhash_node);
-	put_user_ns(up->user_ns);
 }
 
 static struct user_struct *uid_hash_find(kuid_t uid, struct hlist_head *hashent)
@@ -173,8 +172,6 @@ struct user_struct *alloc_uid(kuid_t uid)
 
 		new->uid = uid;
 		atomic_set(&new->__count, 1);
-
-		new->user_ns = get_user_ns(ns);
 
 		/*
 		 * Before adding this, check whether we raced
